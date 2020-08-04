@@ -1,0 +1,13 @@
+{
+    "compilerOptions": {
+        "moduleResolution": "node",
+        "module": "commonjs",
+        "outDir": "lib",
+        "sourceMap": true,
+        "target": "es2017",
+        "lib": ["es2017", "dom"]
+    },
+    "include": [
+        "*.ts"
+    ]
+}

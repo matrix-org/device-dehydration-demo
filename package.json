@@ -1,0 +1,20 @@
+{
+  "name": "dehydration_demo",
+  "version": "0.0.0",
+  "description": "Demo of device dehydration for Matrix",
+  "main": "index.js",
+  "author": "Hubert Chathi",
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "ln -sf node_modules/olm/olm.wasm olm.wasm && browserify index.ts -p [ tsify ] > index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+    "private": true,
+    "dependencies": {
+        "matrix-js-sdk": "file:../matrix-js-sdk"
+    },
+  "devDependencies": {
+    "browserify": "^16.5.1",
+    "tsify": "^4.0.2"
+  }
+}
