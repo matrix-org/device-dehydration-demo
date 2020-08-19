@@ -2,15 +2,40 @@ import * as matrixcs from "matrix-js-sdk";
 import {Buffer} from "buffer";
 import * as olm from "olm";
 
-let client = matrixcs.createClient({
-    baseUrl: "http://localhost:8008"
-});
+const passphrase: string = "secretphrase";
+
 let loggedIn: boolean = false;
 const key: string = "decryption key";
-const loginData = {
-    user: "@alice:example.com",
-    password: "123456",
+
+const ZERO_STR: string = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+
+async function getSecretStorageKey({keys}: {keys: {[propName: string]: any;}}, name: string): Promise<[string, Uint8Array]> {
+    for (const [keyName, keyInfo] of Object.entries(keys)) {
+        //const key = await deriveKey(passphrase, keyInfo.passphrase.salt, keyInfo.passphrase.iterations);
+        const key = Uint8Array.of(36,47,159,193,29,188,180,86,189,180,207,101,79,255,93,159,
+                                  228,43,160,158,98,209,84,196,137,122,119,118,11,131,75,87);
+        const {mac} = await encryptAES(ZERO_STR, key, "", keyInfo.iv);
+        if (keyInfo.mac.replace(/=+$/g, '') === mac.replace(/=+$/g, '')) {
+            return [keyName, key];
+        }
+    }
+    return null;
+}
+
+const cryptoCallbacks = {
+    getSecretStorageKey: getSecretStorageKey,
+    async getDehydrationKey() {
+        return passphrase;
+    },
+    async generateDehydrationKey() {
+        return {key: passphrase};
+    }
 };
+
+let client = matrixcs.createClient({
+    baseUrl: "http://localhost:8008",
+    cryptoCallbacks: cryptoCallbacks,
+} as any);
 
 // fake localstorage
 const dummyStore = {
@@ -83,22 +108,6 @@ async function handleEvent(event): Promise<void> {
     }
 }
 
-const ZERO_STR: string = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
-const passphrase: string = "secretphrase";
-
-async function getSecretStorageKey({keys}: {keys: {[propName: string]: any;}}, name: string): Promise<[string, Uint8Array]> {
-    for (const [keyName, keyInfo] of Object.entries(keys)) {
-        //const key = await deriveKey(passphrase, keyInfo.passphrase.salt, keyInfo.passphrase.iterations);
-        const key = Uint8Array.of(36,47,159,193,29,188,180,86,189,180,207,101,79,255,93,159,
-                                  228,43,160,158,98,209,84,196,137,122,119,118,11,131,75,87);
-        const {mac} = await encryptAES(ZERO_STR, key, "", keyInfo.iv);
-        if (keyInfo.mac.replace(/=+$/g, '') === mac.replace(/=+$/g, '')) {
-            return [keyName, key];
-        }
-    }
-    return null;
-}
-
 let loginButton: HTMLButtonElement;
 window.addEventListener('DOMContentLoaded', async (event) => {
     log.init();
@@ -119,7 +128,7 @@ window.addEventListener('DOMContentLoaded', async (event) => {
             const logdiv = log.log("Logging in...");
 
             // get the dehydrated device (if any) from the server
-            const result = await client.loginWithRehydration("m.login.password", loginData, key);
+            const result = await client.loginWithRehydration("loginWithPassword", "@alice:example.com", "123456");
             console.log(result);
 
             // initialize the client with either the dehydrated device, or using the
@@ -129,9 +138,7 @@ window.addEventListener('DOMContentLoaded', async (event) => {
                 baseUrl: "http://localhost:8008",
                 accessToken: result.access_token,
                 sessionStore: new (matrixcs as any).WebStorageSessionStore(dummyStore),
-                cryptoCallbacks: {
-                    getSecretStorageKey: getSecretStorageKey,
-                },
+                cryptoCallbacks: cryptoCallbacks,
             };
             if (result._olm_account) {
                 opts.deviceToImport = {
@@ -162,7 +169,7 @@ window.addEventListener('DOMContentLoaded', async (event) => {
             client.restoreKeyBackupWithCache(undefined, undefined, backupInfo);
 
             // upload a new dehydrated device
-            await client.dehydrateDevice(key);
+            await client.dehydrateDevice();
 
             loginButton.innerHTML = "Log out";
             logdiv.innerText = "Logged in";
